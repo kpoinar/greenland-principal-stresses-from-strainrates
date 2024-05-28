@@ -30,7 +30,7 @@ ylim = [-3370125 -825000-dy];
 % ylim = [-2605000 -2550000];
 
 % GPS stations
-gps = m_shaperead('~/Library/CloudStorage/Box-Box/gly-kpoinar/gly-kpoinar-projects/FTW-FAM/July2023_imagea-GPS-locations');
+gps = m_shaperead('~/Library/CloudStorage/Box-Box/gly-kpoinar/gly-kpoinar-projects/FTW-FAM/gis/July2023_imagea-GPS-locations');
 gps = cell2mat(gps.ncst);
 
 % Read velocity
@@ -61,7 +61,11 @@ sigma3 = 1/A^(1/n) * epseff.^((1-n)/n) .* e3;
 
 % Begin uncertainty calculations: Get errors in effective strain rate and A
 %d_epseff = 1/sqrt(2) * d_e1 ./ sqrt(e1.^2+e3.^2);
-d_epseff = d_e1 .* (e1.^2 + e3.^2).^0.25;
+%d_epseff = d_e1 .* (e1.^2 + e3.^2).^0.25;
+% update d_epseff May 2024
+h = e1/sqrt(2) * 1./(sqrt(e1.^2+e3.^2+2*shear.^2));
+l = shear ./(sqrt(0.5*e1.^2 + 0.5*e3.^2 + shear.^2)); 
+d_epseff = d_e1 .* sqrt(h.^2 .* (1+(e3./e1).^2) + l.^2);
 d_A = (AofT(-5)-AofT(-15)) * 31557600;
 % d_e3 and d_e1 are already delivered from the strain rate calculations
 
@@ -74,8 +78,8 @@ dsigma3depseff = (1-n)/n * A^(-1/n) * e3 .* epseff.^((1-2*n)/n);
 dsigma1de1 = A^(-1/n) * epseff.^((1-n)/n);
 dsigma3de3 = A^(-1/n) * epseff.^((1-n)/n);
 
-dsigma1dA = 1/n * A^(-1/n-1) * epseff.^((1-n)/n) .* e1;  
-dsigma3dA = 1/n * A^(-1/n-1) * epseff.^((1-n)/n) .* e3;  
+dsigma1dA = 1/n * A^(-1/n-1) * epseff.^((1-n)/n) .* e1;   % 5/24/24 Fixed from ... epseff.^((1-n)/n)
+dsigma3dA = 1/n * A^(-1/n-1) * epseff.^((1-n)/n) .* e3;   % 5/24/24 Fixed from ... epseff.^((1-n)/n)
 
 % Errors from each source: uncertainties times derivatives
 err1_from_epseff = abs(dsigma1depseff .* d_epseff);
@@ -116,19 +120,24 @@ linkaxes(av);
 %% Plot the raw uncertainty sources
 figure(2); clf;
 aw(1) = subplot(1,3,1); hold on;
-pcolor(vels.x/1e3,vels.y/1e3,d_epseff/1e3); shading flat; colorbar;
-t = title('$\delta \dot{\epsilon_E}}$ (kPa)','interpreter','latex');
+pcolor(vels.x/1e3,vels.y/1e3,d_epseff); shading flat; colorbar;
+title('$\delta \epsilon_E$ (per sec)');%,'interpreter','latex');
 plot(gps(:,1)/1e3,gps(:,2)/1e3,'.y')
+c1 = nanmedian(d_epseff(:));
+caxis([0 10*c1])
 
 aw(2) = subplot(1,3,2); hold on;
-pcolor(vels.x/1e3,vels.y/1e3,d_e1/1e3); shading flat; colorbar;
-title('$\delta \epsilon_1$ (kPa)')
+pcolor(vels.x/1e3,vels.y/1e3,d_e1); shading flat; colorbar;
+title('$\delta \epsilon_1$ (per sec)')
 plot(gps(:,1)/1e3,gps(:,2)/1e3,'.y')
+c2 = nanmedian(d_e1(:));
+caxis([0 10*c2])
 
 aw(3) = subplot(1,3,3); hold on;
 pcolor(vels.x/1e3,vels.y/1e3,d_A*ones(size(e1))); shading flat; colorbar;
 title('$\delta A$  (Pa-3 yr-1)')
 plot(gps(:,1)/1e3,gps(:,2)/1e3,'.y')
+caxis([0 d_A])
 linkaxes(aw);
 
 %% Plot the total error (relative to the stress itself)
@@ -153,7 +162,7 @@ hold on
 plot(gps(:,1)/1e3,gps(:,2)/1e3,'*y')
 title('Relative error in $\sigma_3$')
 
-
+%
 %% Write stress data to netcdf
 % Create the ncfile
 ncname = 'GreenlandWinterPrincipalStresses_Compressional_0670.nc';
@@ -293,4 +302,4 @@ nccreate(ncname,'d_principalstress1','Dimensions', {'x', length(vels.x), 'y', le
     ncwrite(ncname,'d_principalstress1',d_e1');    
     ncwriteatt(ncname,'d_principalstress1','description','Uncertainty in more-extensional principal strain rate')   
     ncwriteatt(ncname,'d_principalstress1','units','yr-1')
-
+%
